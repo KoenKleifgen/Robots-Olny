@@ -30,13 +30,16 @@ class CharacterClass(Enum):
     WARRIOR = "Warrior"
     MAGE = "Mage"
     ROGUE = "Rogue"
-    PALADIN = "Paladin"  # New class!
+    PALADIN = "Paladin"
+    HEALER = "Healer"  
 
 class ItemType(Enum):
     WEAPON = "weapon"
+    ARMOR = "armor"
     POTION = "potion"
     ARTIFACT = "artifact"
-    SCROLL = "scroll"  # New item type!
+    SCROLL = "scroll"
+      
 
 @dataclass
 class Ability:
@@ -101,8 +104,10 @@ class Player:
             return Stats(strength=3, agility=4, magic=8, health=base_health, max_health=base_health, mana=150, max_mana=150)
         elif self.character_class == CharacterClass.PALADIN:
             return Stats(strength=7, agility=3, magic=5, health=base_health + 40, max_health=base_health + 40)
-        else:  # Rogue
+        elif self.character_class == CharacterClass.ROGUE:  
             return Stats(strength=5, agility=8, magic=2, health=base_health + 10, max_health=base_health + 10, critical_chance=0.2)
+        else:  
+            return Stats(strength=2, agility=4, magic=11, health=base_health + 30, max_health=base_health + 20, max_mana=200)
 
     def _initialize_abilities(self) -> List[Ability]:
         abilities = []
@@ -126,11 +131,16 @@ class Player:
                 Ability("Holy Strike", "Divine damage + healing", 1.7, 3),
                 Ability("Divine Shield", "Temporary invulnerability", 0, 6)
             ]
+        elif self.character_class == CharacterClass.HEALER:
+            abilities = [
+                Ability("Healing", " Heales 100  HP", 1.7, 0),
+                Ability("Holy Shield", "Temporary invulnerability", 0, 3)
+            ]
         return abilities
     
     def add_item(self, item: Item) -> bool:
      
-        if len(self.inventory) < 10:  # Assuming max inventory size of 10
+        if len(self.inventory) < 10:  
             self.inventory.append(item)
             return True
         return False
@@ -205,6 +215,11 @@ class Player:
         elif self.character_class == CharacterClass.ROGUE:
             self.stats.agility += 3
             self.stats.critical_chance += 0.05
+        elif self.character_class == CharacterClass.PALADIN:
+            self.stats.strength += 3
+        elif self.character_class == CharacterClass.HEALER:
+            self.stats.magic += 6
+            
 
     def show_status(self):
         print(f"\n{Colors.BLUE}=== {self.name} the {self.character_class.value} ===")
@@ -217,32 +232,6 @@ class Player:
         self.experience += amount
         if self.experience >= 100 * self.level:
             self.level_up()
-
-    def level_up(self):
-        self.level += 1
-        self.experience = 0
-        self.stats.max_health += 20
-        self.stats.health = self.stats.max_health
-        dramatic_print(f"\n{Colors.YELLOW}*** LEVEL UP! ***{Colors.ENDC}")
-        dramatic_print(f"You are now level {self.level}!")
-        self._improve_stats()
-
-    def _improve_stats(self):
-        if self.character_class == CharacterClass.WARRIOR:
-            self.stats.strength += 3
-        elif self.character_class == CharacterClass.MAGE:
-            self.stats.magic += 3
-            self.stats.max_mana += 20
-        elif self.character_class == CharacterClass.ROGUE:
-            self.stats.agility += 3
-            self.stats.critical_chance += 0.05
-
-    def show_status(self):
-        print(f"\n{Colors.BLUE}=== {self.name} the {self.character_class.value} ===")
-        print(f"Level: {self.level} | XP: {self.experience}/100")
-        print(f"Health: {self.stats.health}/{self.stats.max_health}")
-        print(f"Mana: {self.stats.mana}/{self.stats.max_mana}")
-        print(f"Gold: {self.gold}{Colors.ENDC}")
 
 class Game:
     def __init__(self):
@@ -269,6 +258,8 @@ class Game:
                 print("  Expert in stealth and critical strikes")
             elif char_class == CharacterClass.PALADIN:
                 print("  Holy warrior with healing powers")
+            elif char_class == CharacterClass.HEALER:
+                print("  Low damage with High self healing powers")
             print()
             
         while True:
@@ -286,7 +277,7 @@ class Game:
         starting_items = {
             CharacterClass.WARRIOR: [
                 Item("Steel Greatsword", ItemType.WEAPON, "A mighty two-handed sword", 8),
-                Item("Chain Mail", ItemType.ARTIFACT, "Standard protective armor", 5)
+                Item("Chain Mail", ItemType.ARMOR, "Standard protective armor", 5)
             ],
             CharacterClass.MAGE: [
                 Item("Enchanted Staff", ItemType.WEAPON, "A staff crackling with energy", 6),
@@ -299,7 +290,11 @@ class Game:
             CharacterClass.PALADIN: [
                 Item("Holy Mace", ItemType.WEAPON, "A mace blessed with divine power", 7),
                 Item("Holy Symbol", ItemType.ARTIFACT, "Enhances healing abilities", 5)
-            ]
+            ],
+            CharacterClass.HEALER: [
+                Item("Healing Staff", ItemType.WEAPON, "A Staff to heal yourself", 7),
+                Item("Helath Potion", ItemType.POTION, "Restores 30 HP", 30, 2)
+            ],
         }
         
         for item in starting_items[self.player.character_class]:
@@ -321,6 +316,7 @@ class Game:
             print("2. Defend")
             print("3. Use Item")
             print("4. Use Ability")
+            print("5. Rest to Restore Health")
             
             action = input(f"\n{Colors.GREEN}Choose your action (1-4): {Colors.ENDC}")
             
@@ -368,12 +364,22 @@ class Game:
                             ability.current_cooldown = ability.cooldown
                             dramatic_print(f"\n{Colors.YELLOW}You use {ability.name}!")
                             dramatic_print(f"It deals {Colors.GREEN}{damage}{Colors.ENDC} damage!")
+                            
                         else:
                             print(f"{Colors.RED}That ability is on cooldown!{Colors.ENDC}")
                 except ValueError:
                     print(f"{Colors.RED}Invalid input!{Colors.ENDC}")
                     continue
-            
+
+            elif action == "5":
+                if self.player.gold >= 10:
+                        self.player.gold -= 10
+                        heal_amount = self.player.stats.max_health // 2
+                        self.player.stats.health = min(
+                            self.player.stats.health + heal_amount,
+                            self.player.stats.max_health
+                        )
+                
             else:
                 print(f"{Colors.RED}Invalid action!{Colors.ENDC}")
                 continue
